@@ -165,17 +165,40 @@ export default function PracticeScenarioPage() {
     
     if (currentScenario.questions) {
       currentScenario.questions.forEach((question, index) => {
-        totalPoints += question.points || 10;
+        const questionPoints = question.points || 10;
+        totalPoints += questionPoints;
+        
         if (userAnswers[index] !== undefined && userAnswers[index] !== null && userAnswers[index] !== '') {
-          // Simple scoring - in real app, you'd have more sophisticated logic
-          totalScore += (question.points || 10) * 0.8; // Assume 80% correct for demo
+          // Calculate score based on answer correctness
+          // For now, we'll use a simple scoring system
+          // In a real implementation, you'd compare answers with correct_answer
+          const isCorrect = checkAnswerCorrectness(question, userAnswers[index]);
+          totalScore += isCorrect ? questionPoints : Math.round(questionPoints * 0.3); // 30% for partial credit
         }
       });
+    }
+    
+    // If no questions, use scenario points as base
+    if (totalPoints === 0) {
+      totalPoints = currentScenario.points || 100;
+      totalScore = Math.round(totalPoints * 0.8); // Default 80% for completion
     }
     
     const finalScore = Math.round((totalScore / totalPoints) * 100);
     setScore(finalScore);
     return finalScore;
+  };
+
+  const checkAnswerCorrectness = (question, userAnswer) => {
+    // Simple answer checking logic
+    // In a real implementation, you'd have more sophisticated comparison
+    if (question.question_type === 'multiple-choice') {
+      // For multiple choice, check if answer matches correct_answer
+      return userAnswer.toString() === (question.correct_answer || '0');
+    } else {
+      // For other types, check if answer is not empty and has some content
+      return userAnswer && userAnswer.toString().trim().length > 0;
+    }
   };
 
   const saveProgress = async (finalScore) => {
