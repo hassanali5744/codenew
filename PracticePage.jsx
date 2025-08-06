@@ -178,10 +178,10 @@ export default function PracticePage() {
           const stats = statsData.data.overview;
           setUserStats({
             totalCompleted: stats.completed_scenarios || 0,
-            totalPoints: Math.round(stats.average_score * (stats.completed_scenarios || 0)) || 0,
-            currentStreak: 7, // This would need a separate API endpoint for streak calculation
+            totalPoints: stats.total_points_earned || 0, // Use actual scenario points
+            currentStreak: stats.current_streak || 0, // Use calculated day streak
             averageScore: Math.round(stats.average_score || 0),
-            rank: 156, // This would need a separate API endpoint for ranking
+            rank: stats.rank || 1, // Use actual ranking
             level: Math.floor((stats.completed_scenarios || 0) / 10) + 1
           });
         }
