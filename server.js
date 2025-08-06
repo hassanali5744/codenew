@@ -574,84 +574,7 @@ app.get('/api/books/categories', async (req, res) => {
   }
 });
 
-/*// Create Tool
-app.post('/api/tools', async (req, res) => {
-  const { name, type, description, usage, image_url, download_url } = req.body;
-  try {
-    const result = await executeQuery(
-      'INSERT INTO tools (name, type, description, `usage`, image_url, download_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, type, description, usage, image_url, download_url]
-    );
-    res.status(201).json({ success: true, id: result.insertId });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to add tool' });
-  }
-});
 
-// Get All Tools (with optional search)
-app.get('/api/tools', async (req, res) => {
-  const { search } = req.query;
-  try {
-    let query = 'SELECT * FROM tools';
-    const params = [];
-    if (search) {
-      query += ' WHERE name LIKE ? OR type LIKE ?';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-    const tools = await executeQuery(query, params);
-    res.json(tools);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to fetch tools' });
-  }
-});
-
-app.put('/api/tools/:id', async (req, res) => {
-  const { id } = req.params;
-  let {
-    name,
-    type,
-    description,
-    usage,
-    imageUrl,
-    downloadUrl
-  } = req.body;
-
-  // Fallback to null if any are undefined
-  name = name ?? null;
-  type = type ?? null;
-  description = description ?? null;
-  usage = usage ?? null;
-  imageUrl = imageUrl ?? null;
-  downloadUrl = downloadUrl ?? null;
-
-  try {
-    await executeQuery(
-      'UPDATE tools SET name = ?, type = ?, description = ?, `usage` = ?, image_url = ?, download_url = ? WHERE id = ?',
-      [name, type, description, usage, imageUrl, downloadUrl, id]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to update tool' });
-  }
-});
-
-
-
-// Delete Tool
-app.delete('/api/tools/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    await executeQuery('DELETE FROM tools WHERE id = ?', [id]);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to delete tool' });
-  }
-});
-*/
 // Contact form endpoint
 app.post('/api/contact', async (req, res) => {
   const { name, email, message } = req.body;
@@ -1202,24 +1125,128 @@ app.get('/api/practice/bookmarks', authenticateToken, async (req, res) => {
   }
 });
 
+// Get practice leaderboard
+app.get('/api/practice/leaderboard', async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+    
+    const leaderboard = await executeQuery(
+      `SELECT 
+        u.id,
+        u.username,
+        COUNT(CASE WHEN upp.is_completed = TRUE THEN 1 END) as completed_scenarios,
+        COALESCE(SUM(CASE WHEN upp.is_completed = TRUE THEN ps.points END), 0) as total_points,
+        AVG(CASE WHEN upp.is_completed = TRUE THEN upp.score END) as average_score,
+        MAX(upp.completed_at) as last_completed
+       FROM users u
+       LEFT JOIN user_practice_progress upp ON u.id = upp.user_id
+       LEFT JOIN practice_scenarios ps ON upp.scenario_id = ps.id AND ps.is_active = TRUE
+       GROUP BY u.id, u.username
+       HAVING total_points > 0
+       ORDER BY total_points DESC, completed_scenarios DESC, average_score DESC
+       LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+    
+    // Add rank to each user
+    const rankedLeaderboard = leaderboard.map((user, index) => ({
+      ...user,
+      user_rank: parseInt(offset) + index + 1
+    }));
+    
+    res.json({
+      success: true,
+      data: rankedLeaderboard
+    });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch leaderboard',
+      error: error.message
+    });
+  }
+});
+
 // Get practice statistics
 app.get('/api/practice/stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Get user's practice statistics
+    // Get user's practice statistics with correct point calculation
     const stats = await executeQuery(
       `SELECT 
         COUNT(*) as total_scenarios,
-        COUNT(CASE WHEN is_completed = TRUE THEN 1 END) as completed_scenarios,
-        AVG(CASE WHEN is_completed = TRUE THEN score END) as average_score,
-        SUM(CASE WHEN is_completed = TRUE THEN time_taken END) as total_time,
-        MAX(completed_at) as last_completed
-       FROM user_practice_progress upp
-       INNER JOIN practice_scenarios ps ON upp.scenario_id = ps.id
-       WHERE upp.user_id = ? AND ps.is_active = TRUE`,
+        COUNT(CASE WHEN upp.is_completed = TRUE THEN 1 END) as completed_scenarios,
+        AVG(CASE WHEN upp.is_completed = TRUE THEN upp.score END) as average_score,
+        SUM(CASE WHEN upp.is_completed = TRUE THEN upp.time_taken END) as total_time,
+        SUM(CASE WHEN upp.is_completed = TRUE THEN ps.points END) as total_points_earned,
+        MAX(upp.completed_at) as last_completed
+       FROM practice_scenarios ps
+       LEFT JOIN user_practice_progress upp ON ps.id = upp.scenario_id AND upp.user_id = ?
+       WHERE ps.is_active = TRUE`,
       [userId]
     );
+    
+    // Calculate day streak
+    const streakData = await executeQuery(
+      `SELECT 
+        DATE(completed_at) as completion_date,
+        COUNT(*) as completions_per_day
+       FROM user_practice_progress upp
+       INNER JOIN practice_scenarios ps ON upp.scenario_id = ps.id
+       WHERE upp.user_id = ? AND upp.is_completed = TRUE AND ps.is_active = TRUE
+       GROUP BY DATE(completed_at)
+       ORDER BY completion_date DESC`,
+      [userId]
+    );
+    
+    let currentStreak = 0;
+    if (streakData.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      for (let i = 0; i < streakData.length; i++) {
+        const date = streakData[i].completion_date;
+        if (i === 0 && (date === today || date === yesterday)) {
+          currentStreak = 1;
+          // Check consecutive days
+          for (let j = 1; j < streakData.length; j++) {
+            const expectedDate = new Date(date);
+            expectedDate.setDate(expectedDate.getDate() - j);
+            const expectedDateStr = expectedDate.toISOString().split('T')[0];
+            
+            if (streakData[j] && streakData[j].completion_date === expectedDateStr) {
+              currentStreak++;
+            } else {
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+    
+    // Get user's rank based on total points earned - simplified approach
+    const allUserPoints = await executeQuery(
+      `SELECT 
+         u.id,
+         COALESCE(SUM(ps.points), 0) as total_points
+       FROM users u
+       LEFT JOIN user_practice_progress upp ON u.id = upp.user_id AND upp.is_completed = TRUE
+       LEFT JOIN practice_scenarios ps ON upp.scenario_id = ps.id AND ps.is_active = TRUE
+       GROUP BY u.id
+       ORDER BY total_points DESC`,
+      []
+    );
+    
+    // Calculate user's rank in JavaScript
+    const currentUserPoints = stats[0].total_points_earned || 0;
+    const userRank = allUserPoints.findIndex(user => user.id === userId) + 1;
+    const finalRank = userRank > 0 ? userRank : allUserPoints.length + 1;
+    
+    // Get total users count for ranking context
+    const totalUsers = await executeQuery('SELECT COUNT(*) as count FROM users');
     
     // Get category breakdown
     const categoryStats = await executeQuery(
@@ -1227,7 +1254,8 @@ app.get('/api/practice/stats', authenticateToken, async (req, res) => {
         ps.category,
         COUNT(*) as total,
         COUNT(CASE WHEN upp.is_completed = TRUE THEN 1 END) as completed,
-        AVG(CASE WHEN upp.is_completed = TRUE THEN upp.score END) as avg_score
+        AVG(CASE WHEN upp.is_completed = TRUE THEN upp.score END) as avg_score,
+        SUM(CASE WHEN upp.is_completed = TRUE THEN ps.points END) as points_earned
        FROM practice_scenarios ps
        LEFT JOIN user_practice_progress upp ON ps.id = upp.scenario_id AND upp.user_id = ?
        WHERE ps.is_active = TRUE
@@ -1238,7 +1266,13 @@ app.get('/api/practice/stats', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       data: {
-        overview: stats[0],
+        overview: {
+          ...stats[0],
+          total_points_earned: stats[0].total_points_earned || 0,
+          current_streak: currentStreak,
+          rank: finalRank,
+          total_users: totalUsers[0]?.count || 1
+        },
         categories: categoryStats
       }
     });
