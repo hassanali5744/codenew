@@ -176,13 +176,16 @@ export default function PracticePage() {
 
         if (statsData.success) {
           const stats = statsData.data.overview;
+          // Calculate level based on totalPoints (every 100 points = 1 level)
+          const totalPoints = stats.total_points_earned || 0;
+          const calculatedLevel = Math.floor(totalPoints / 100) + 1;
           setUserStats({
             totalCompleted: stats.completed_scenarios || 0,
-            totalPoints: stats.total_points_earned || 0, // Use actual scenario points
+            totalPoints: totalPoints, // Use actual scenario points
             currentStreak: stats.current_streak || 0, // Use calculated day streak
             averageScore: Math.round(stats.average_score || 0),
             rank: stats.rank || 1, // Use actual ranking
-            level: Math.floor((stats.completed_scenarios || 0) / 10) + 1
+            level: calculatedLevel
           });
         }
       } catch (err) {
@@ -370,15 +373,15 @@ export default function PracticePage() {
                 
                 {/* Sort Dropdown */}
                 <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="popular">Most Popular</option>
-                  <option value="newest">Newest First</option>
-                  <option value="difficulty">Difficulty</option>
-                  <option value="points">Most Points</option>
-                </select>
+  value={sortBy}
+  onChange={(e) => setSortBy(e.target.value)}
+  className="px-4 py-3 bg-blue-600 text-white border border-blue-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+>
+  <option value="popular">Most Popular</option>
+  <option value="newest">Newest First</option>
+  <option value="difficulty">Difficulty</option>
+  <option value="points">Most Points</option>
+</select>
 
                 {/* Filter Toggle */}
                 <button
