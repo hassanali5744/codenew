@@ -193,7 +193,7 @@ function authenticateToken(req, res, next) {
 // Get current user endpoint
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    const user = await executeQuery('SELECT id, username, email FROM users WHERE id = ?', [req.user.id]);
+    const user = await executeQuery('SELECT id, username, email,profile_pic FROM users WHERE id = ?', [req.user.id]);
     
     if (user.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -406,6 +406,47 @@ app.post('/api/auth/reset-password/:token', async (req, res) => {
   } catch (err) {
     console.error('Reset password error:', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Update user profile (username, profile_pic)
+app.put('/api/auth/update', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { username, profile_pic } = req.body;
+    if (!username) {
+      return res.status(400).json({ success: false, message: 'Username is required' });
+    }
+    await executeQuery('UPDATE users SET username = ?, profile_pic = ? WHERE id = ?', [username, profile_pic || null, userId]);
+    res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ success: false, message: 'Failed to update profile' });
+  }
+});
+
+// Change user password
+app.put('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current and new password are required' });
+    }
+    const user = await executeQuery('SELECT password_hash FROM users WHERE id = ?', [userId]);
+    if (!user.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user[0].password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await executeQuery('UPDATE users SET password_hash = ? WHERE id = ?', [hashedPassword, userId]);
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ success: false, message: 'Failed to change password' });
   }
 });
 
@@ -1128,7 +1169,9 @@ app.get('/api/practice/bookmarks', authenticateToken, async (req, res) => {
 // Get practice leaderboard
 app.get('/api/practice/leaderboard', async (req, res) => {
   try {
-    const { limit = 50, offset = 0 } = req.query;
+    // Parse and sanitize limit/offset
+    const limit = 50;
+    const offset = 0;
     
     const leaderboard = await executeQuery(
       `SELECT 
@@ -1144,14 +1187,13 @@ app.get('/api/practice/leaderboard', async (req, res) => {
        GROUP BY u.id, u.username
        HAVING total_points > 0
        ORDER BY total_points DESC, completed_scenarios DESC, average_score DESC
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
+       LIMIT ${limit} OFFSET ${offset}`
     );
     
     // Add rank to each user
     const rankedLeaderboard = leaderboard.map((user, index) => ({
       ...user,
-      user_rank: parseInt(offset) + index + 1
+      user_rank: offset + index + 1
     }));
     
     res.json({
