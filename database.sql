@@ -8,7 +8,13 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE users
+ADD COLUMN profile_picture VARCHAR(255);
 select * from users
+ALTER TABLE users ADD COLUMN profile_pic TEXT;
+ALTER TABLE users MODIFY COLUMN profile_pic LONGTEXT;
+ALTER TABLE users DROP COLUMN profile_picture;
+
 ALTER TABLE users
 ADD COLUMN reset_token VARCHAR(255),
 ADD COLUMN reset_token_expiry BIGINT;
@@ -67,21 +73,6 @@ CREATE TABLE IF NOT EXISTS books (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-
-
-INSERT INTO books (title, description, category, author, cover, pdf, rating, downloads, read_time, pages, published, featured) VALUES
-('Cybersecurity Essentials', 'A comprehensive guide for beginners in cybersecurity covering fundamental concepts, threats, and defense strategies.', 'beginner', 'Sarah Chen', 'https://i.postimg.cc/wMTyrVT0/48992298.jpg', '#', 4.8, 1247, '6-8 hours', 320, '2024', TRUE),
-('Advanced Penetration Testing', 'Deep dive into advanced pentesting techniques, methodologies, and real-world scenarios for experienced security professionals.', 'advanced', 'Mike Rodriguez', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.9, 892, '10-12 hours', 450, '2024', TRUE),
-('Digital Forensics Handbook', 'Learn the basics of digital forensics, evidence collection, and analysis techniques for cyber investigations.', 'forensics', 'Dr. Emily Watson', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.7, 567, '8-10 hours', 380, '2023', FALSE),
-('Hacking Tools Explained', 'Comprehensive overview of popular cybersecurity tools, their usage, and best practices for ethical hacking.', 'tools', 'Alex Thompson', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.6, 734, '5-7 hours', 280, '2024', FALSE),
-('Network Security Fundamentals', 'Essential concepts and practices for securing network infrastructure and protecting against cyber threats.', 'intermediate', 'David Kim', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.5, 445, '7-9 hours', 350, '2023', FALSE),
-('Web Application Security', 'Comprehensive guide to securing web applications, covering OWASP Top 10 and modern security practices.', 'intermediate', 'Lisa Wang', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.7, 623, '8-10 hours', 400, '2024', FALSE),
-('Malware Analysis Techniques', 'Advanced techniques for analyzing malware, reverse engineering, and threat intelligence gathering.', 'advanced', 'Dr. James Wilson', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.8, 456, '12-15 hours', 520, '2023', FALSE),
-('Cloud Security Best Practices', 'Complete guide to securing cloud environments including AWS, Azure, and GCP security implementations.', 'intermediate', 'Maria Garcia', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.6, 789, '9-11 hours', 380, '2024', FALSE),
-('Incident Response Guide', 'Step-by-step guide to handling cybersecurity incidents, from detection to recovery and lessons learned.', 'intermediate', 'Robert Johnson', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.5, 567, '7-9 hours', 320, '2023', FALSE),
-('Cryptography Fundamentals', 'Introduction to cryptographic principles, algorithms, and their applications in cybersecurity.', 'beginner', 'Dr. Amanda Lee', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.4, 345, '6-8 hours', 280, '2024', FALSE),
-('IoT Security Handbook', 'Security considerations and best practices for Internet of Things devices and networks.', 'intermediate', 'Kevin Chen', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.3, 234, '5-7 hours', 250, '2023', FALSE),
-('Mobile Security Essentials', 'Comprehensive guide to mobile application security, covering Android and iOS security practices.', 'intermediate', 'Jennifer Smith', 'https://img.icons8.com/ios-filled/100/000000/book.png', '#', 4.6, 456, '8-10 hours', 340, '2024', FALSE);
 
 
 select * from Books
@@ -148,7 +139,7 @@ CREATE TABLE IF NOT EXISTS practice_questions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (scenario_id) REFERENCES practice_scenarios(id) ON DELETE CASCADE
 );
-
+select * from user_practice_progress
 -- Create user practice progress table
 CREATE TABLE IF NOT EXISTS user_practice_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -165,6 +156,8 @@ CREATE TABLE IF NOT EXISTS user_practice_progress (
     FOREIGN KEY (scenario_id) REFERENCES practice_scenarios(id) ON DELETE CASCADE,
     UNIQUE KEY unique_user_scenario (user_id, scenario_id)
 );
+ALTER TABLE user_practice_progress
+ADD COLUMN level INT DEFAULT 1
 select * from user_practice_progress
 -- Create user practice bookmarks table
 CREATE TABLE IF NOT EXISTS user_practice_bookmarks (
@@ -176,44 +169,6 @@ CREATE TABLE IF NOT EXISTS user_practice_bookmarks (
     FOREIGN KEY (scenario_id) REFERENCES practice_scenarios(id) ON DELETE CASCADE,
     UNIQUE KEY unique_user_bookmark (user_id, scenario_id)
 );
-
--- Insert default categories
-INSERT INTO practice_categories (key_name, label, description, color_gradient, count) VALUES
-('all', 'All Categories', 'Complete collection of cybersecurity scenarios', 'from-blue-500 to-cyan-500', 0),
-('web', 'Web Security', 'OWASP Top 10, XSS, SQL Injection, CSRF', 'from-green-500 to-emerald-500', 0),
-('forensics', 'Digital Forensics', 'Memory analysis, disk forensics, network forensics', 'from-purple-500 to-pink-500', 0),
-('crypto', 'Cryptography', 'Encryption, hashing, digital signatures, PKI', 'from-yellow-500 to-orange-500', 0),
-('reverse', 'Reverse Engineering', 'Malware analysis, binary exploitation, debugging', 'from-red-500 to-pink-500', 0),
-('network', 'Network Security', 'Network protocols, firewalls, IDS/IPS, VPN', 'from-indigo-500 to-purple-500', 0),
-('osint', 'OSINT', 'Open source intelligence gathering', 'from-teal-500 to-cyan-500', 0);
-
--- Insert sample practice scenarios
-INSERT INTO practice_scenarios (title, category, difficulty, time_estimate, questions_count, points, completion_rate, likes, views, description, tags, is_featured) VALUES
-('Advanced SQL Injection', 'web', 'Hard', '15 min', 8, 150, 87.5, 234, 1247, 'Master advanced SQL injection techniques including blind, time-based, and union-based attacks.', '["SQL Injection", "Web Security", "Database"]', TRUE),
-('Memory Forensics Analysis', 'forensics', 'Medium', '20 min', 12, 200, 92.0, 189, 892, 'Analyze memory dumps to identify malicious processes and extract artifacts.', '["Memory Analysis", "Volatility", "Malware"]', FALSE),
-('RSA Cryptography Challenge', 'crypto', 'Easy', '10 min', 6, 100, 95.0, 156, 567, 'Understand RSA encryption, key generation, and digital signatures.', '["RSA", "Public Key", "Digital Signatures"]', FALSE),
-('Malware Reverse Engineering', 'reverse', 'Hard', '25 min', 15, 300, 78.0, 312, 1456, 'Reverse engineer a malicious binary to understand its behavior and capabilities.', '["Malware", "IDA Pro", "Assembly"]', TRUE),
-('Network Traffic Analysis', 'network', 'Medium', '18 min', 10, 175, 89.0, 201, 934, 'Analyze network packets to identify suspicious activities and protocols.', '["Wireshark", "Network", "Protocols"]', FALSE),
-('Social Media OSINT', 'osint', 'Easy', '12 min', 7, 125, 91.0, 134, 678, 'Gather intelligence from social media platforms and public sources.', '["OSINT", "Social Media", "Information Gathering"]', FALSE);
-
--- Insert sample questions for the first scenario (Advanced SQL Injection)
-INSERT INTO practice_questions (scenario_id, question_text, question_type, difficulty, points, time_limit, options, correct_answer, explanation, order_index) VALUES
-(1, 'What is the primary goal of a SQL injection attack?', 'multiple-choice', 'Medium', 20, 2, '["To steal user credentials", "To execute arbitrary SQL commands", "To bypass authentication", "All of the above"]', '3', 'SQL injection attacks aim to execute arbitrary SQL commands, which can lead to data theft, authentication bypass, and other malicious activities.', 1),
-(1, 'Write a SQL query to safely retrieve user data using parameterized queries. The table name is "users" and you need to get users by their email.', 'coding', 'Hard', 25, 5, NULL, 'SELECT * FROM users WHERE email = ?', 'Parameterized queries separate SQL logic from data, preventing injection attacks.', 2),
-(1, 'You discover a login form vulnerable to SQL injection. The query is: SELECT * FROM users WHERE username="$username" AND password="$password". How would you exploit this?', 'scenario', 'Hard', 30, 5, NULL, "Use ' OR '1'='1' -- as username to bypass authentication", 'This payload closes the username field and adds a condition that is always true, bypassing the password check.', 3),
-(1, 'Which of the following is NOT a type of SQL injection?', 'multiple-choice', 'Easy', 15, 2, '["Union-based injection", "Boolean-based blind injection", "Time-based blind injection", "Cross-site scripting injection"]', '3', 'Cross-site scripting (XSS) is a different type of attack. The other options are all types of SQL injection.', 4),
-(1, 'Analyze this code snippet and identify the SQL injection vulnerability:', 'practical', 'Medium', 20, 3, NULL, 'Direct concatenation of user input without sanitization', 'The code directly concatenates user input into the SQL query, making it vulnerable to injection attacks.', 5);
-
--- Insert sample questions for the second scenario (Memory Forensics Analysis)
-INSERT INTO practice_questions (scenario_id, question_text, question_type, difficulty, points, time_limit, options, correct_answer, explanation, order_index) VALUES
-(2, 'What is the primary purpose of memory forensics?', 'multiple-choice', 'Easy', 15, 2, '["To recover deleted files", "To analyze running processes and system state", "To decrypt encrypted data", "To repair corrupted memory"]', '1', 'Memory forensics focuses on analyzing the current state of system memory, including running processes, network connections, and system artifacts.', 1),
-(2, 'Using Volatility Framework, what command would you use to list all running processes?', 'practical', 'Medium', 20, 3, NULL, 'pslist', 'The "pslist" command in Volatility lists all running processes in the memory dump.', 2),
-(2, 'You are analyzing a memory dump and find a suspicious process with no parent process. What does this indicate?', 'scenario', 'Hard', 25, 4, NULL, 'Potential malware or process injection', 'Processes without parent processes often indicate malware or process injection techniques used to hide malicious activity.', 3);
-
--- Insert sample questions for the third scenario (RSA Cryptography Challenge)
-INSERT INTO practice_questions (scenario_id, question_text, question_type, difficulty, points, time_limit, options, correct_answer, explanation, order_index) VALUES
-(3, 'What does RSA stand for?', 'multiple-choice', 'Easy', 10, 1, '["Rivest-Shamir-Adleman", "Random Secure Algorithm", "Rapid Security Authentication", "Robust Security Architecture"]', '0', 'RSA stands for Rivest-Shamir-Adleman, named after its creators.', 1),
-(3, 'Implement a simple RSA key generation function in Python.', 'coding', 'Medium', 30, 8, NULL, 'def generate_rsa_keys(bits=1024):\n    # Implementation here\n    pass', 'RSA key generation involves finding two large prime numbers and calculating the public/private key pair.', 2);
 
 -- Update category counts
 UPDATE practice_categories SET count = (
@@ -251,6 +206,7 @@ CREATE TABLE blogs (
   featured BOOLEAN DEFAULT FALSE,
   views INT DEFAULT 0
 );
+describe user_practice_progress
 select * from blogs
 select * from tools
 ALTER TABLE tools
@@ -414,4 +370,17 @@ VALUES (
   FALSE,
   1100
 );
-
+SELECT 
+        u.id,
+        u.username,
+        COUNT(CASE WHEN upp.is_completed = TRUE THEN 1 END) as completed_scenarios,
+        COALESCE(SUM(CASE WHEN upp.is_completed = TRUE THEN ps.points END), 0) as total_points,
+        AVG(CASE WHEN upp.is_completed = TRUE THEN upp.score END) as average_score,
+        MAX(upp.completed_at) as last_completed
+       FROM users u
+       LEFT JOIN user_practice_progress upp ON u.id = upp.user_id
+       LEFT JOIN practice_scenarios ps ON upp.scenario_id = ps.id AND ps.is_active = TRUE
+       GROUP BY u.id, u.username
+       HAVING total_points > 0
+       ORDER BY total_points DESC, completed_scenarios DESC, average_score DESC
+       LIMIT 50 OFFSET 0
